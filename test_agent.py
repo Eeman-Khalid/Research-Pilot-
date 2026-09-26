@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 
 from app.research_agent import ResearchAgent
+from app.evaluation import evaluate_research_result, print_evaluation
 
 
 load_dotenv()
@@ -17,7 +18,6 @@ agent = ResearchAgent(api_key)
 
 topic = "Impact of Artificial Intelligence on Healthcare"
 
-
 result = agent.run(topic)
 
 
@@ -26,11 +26,11 @@ print("=" * 60)
 
 print(result["report"])
 
-print("\n\nPIPELINE CHECK")
-print("=" * 60)
 
-print("Topic:", result["topic"])
-print("Questions generated:", len(result["questions"].splitlines()))
-print("Research questions searched:", len(result["research_data"]))
-print("Research analyses completed:", len(result["analyses"]))
-print("Report generated:", bool(result["report"]))
+# -----------------------------
+# Evaluate Research Pipeline
+# -----------------------------
+
+evaluation = evaluate_research_result(result)
+
+print_evaluation(evaluation)
