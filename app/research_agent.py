@@ -1,5 +1,7 @@
 import time
+import requests
 
+from bs4 import BeautifulSoup
 from ddgs import DDGS
 from google import genai
 from google.genai import errors
@@ -87,7 +89,53 @@ Return only the 5 questions as a numbered list.
         return results
 
     # -----------------------------
-    # 3. Search Each Question
+    # 3. Fetch Webpage Content
+    # -----------------------------
+    def fetch_webpage(self, url, max_chars=10000):
+
+        try:
+
+            response = requests.get(
+                url,
+                timeout=10,
+                headers={
+                    "User-Agent": "Mozilla/5.0"
+                }
+            )
+
+            response.raise_for_status()
+
+            soup = BeautifulSoup(
+                response.text,
+                "html.parser"
+            )
+
+            # Remove unnecessary webpage elements
+            for element in soup([
+                "script",
+                "style",
+                "nav",
+                "footer",
+                "header"
+            ]):
+                element.decompose()
+
+            text = soup.get_text(
+                separator=" ",
+                strip=True
+            )
+
+            return text[:max_chars]
+
+        except Exception as e:
+
+            print(f"Could not fetch source: {url}")
+            print(f"Reason: {e}")
+
+            return ""
+
+    # -----------------------------
+    # 4. Search Each Question
     # -----------------------------
     def research_questions_to_searches(self, questions):
 
@@ -101,10 +149,28 @@ Return only the 5 questions as a numbered list.
 
                 question = question.split(".", 1)[-1].strip()
 
+                print(f"\nSearching: {question}")
+
                 results = self.search_web(
                     question,
                     max_results=3
                 )
+
+                # Fetch actual webpage content
+                for source in results:
+
+                    print(f"Reading: {source['title']}")
+
+                    content = self.fetch_webpage(
+                        source["url"]
+                    )
+
+                    # If webpage cannot be fetched,
+                    # keep the search snippet as fallback
+                    if not content:
+                        content = source["snippet"]
+
+                    source["content"] = content
 
                 searches.append({
                     "question": question,
@@ -114,7 +180,7 @@ Return only the 5 questions as a numbered list.
         return searches
 
     # -----------------------------
-    # 4. Analyze Sources
+    # 5. Analyze Sources
     # -----------------------------
     def analyze_sources(self, question, sources):
 
@@ -125,9 +191,14 @@ Return only the 5 questions as a numbered list.
             source_text += f"""
 Source {i}
 
-Title: {source['title']}
-URL: {source['url']}
-Snippet: {source['snippet']}
+Title:
+{source['title']}
+
+URL:
+{source['url']}
+
+Content:
+{source.get('content', source.get('snippet', ''))}
 """
 
         prompt = f"""
@@ -136,19 +207,27 @@ You are an AI research analyst.
 Research Question:
 {question}
 
-Below are web search results related to this question:
+Below are webpages collected from web search.
+
+Analyze the actual source content provided below.
 
 {source_text}
 
-Analyze these sources and provide:
+Provide:
 
 1. The main findings
 2. Important facts or claims
 3. Areas where the sources agree
-4. Areas where the sources differ or provide uncertainty
+4. Areas where the sources differ
+5. Important uncertainties or limitations
 
-Do not invent information that is not supported by the provided sources.
-Clearly mention when the available information is insufficient.
+Rules:
+
+- Use only information supported by the provided source content.
+- Do not invent facts.
+- Do not assume information that is not present.
+- Clearly state when the available sources are insufficient.
+- Identify which source supports important claims.
 """
 
         response = self._generate_content(prompt)
@@ -156,7 +235,7 @@ Clearly mention when the available information is insufficient.
         return response.text
 
     # -----------------------------
-    # 5. Analyze All Research
+    # 6. Analyze All Research
     # -----------------------------
     def analyze_all_research(self, research_data, max_retries=3):
 
@@ -190,7 +269,9 @@ Clearly mention when the available information is insufficient.
 
                 except Exception as e:
 
-                    print(f"⚠ Attempt {attempt} failed: {e}")
+                    print(
+                        f"⚠ Attempt {attempt} failed: {e}"
+                    )
 
                     if attempt < max_retries:
 
@@ -206,7 +287,7 @@ Clearly mention when the available information is insufficient.
         return analyses
 
     # -----------------------------
-    # 6. Generate Final Report
+    # 7. Generate Final Report
     # -----------------------------
     def generate_report(self, topic, all_research):
 
@@ -236,7 +317,7 @@ You are a professional research report writer.
 Research Topic:
 {topic}
 
-Below is research collected and analyzed from multiple web sources:
+Below is research collected, read, and analyzed from multiple web sources:
 
 {research_text}
 
@@ -266,25 +347,32 @@ Important rules:
         response = self._generate_content(prompt)
 
         return response.text
+
     # -----------------------------
-    # 7. Run Complete Research Pipeline
+    # 8. Run Complete Research Pipeline
     # -----------------------------
     def run(self, topic):
 
         print("\nGenerating research questions...")
-        questions = self.generate_research_questions(topic)
 
-        print("\nSearching the web...")
+        questions = self.generate_research_questions(
+            topic
+        )
+
+        print("\nSearching the web and reading sources...")
+
         research_data = self.research_questions_to_searches(
             questions
         )
 
         print("\nAnalyzing sources...")
+
         analyses = self.analyze_all_research(
             research_data
         )
 
         print("\nGenerating final report...")
+
         report = self.generate_report(
             topic,
             analyses
