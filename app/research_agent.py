@@ -40,7 +40,10 @@ class ResearchAgent:
 
                 wait_time = 5 * attempt
 
-                print(f"Retrying in {wait_time} seconds...")
+                print(
+                    f"Retrying in {wait_time} seconds..."
+                )
+
                 time.sleep(wait_time)
 
     # -----------------------------
@@ -118,6 +121,7 @@ Return only the 5 questions as a numbered list.
                 "footer",
                 "header"
             ]):
+
                 element.decompose()
 
             text = soup.get_text(
@@ -129,8 +133,13 @@ Return only the 5 questions as a numbered list.
 
         except Exception as e:
 
-            print(f"Could not fetch source: {url}")
-            print(f"Reason: {e}")
+            print(
+                f"Could not fetch source: {url}"
+            )
+
+            print(
+                f"Reason: {e}"
+            )
 
             return ""
 
@@ -147,9 +156,14 @@ Return only the 5 questions as a numbered list.
 
             if question and question[0].isdigit():
 
-                question = question.split(".", 1)[-1].strip()
+                question = question.split(
+                    ".",
+                    1
+                )[-1].strip()
 
-                print(f"\nSearching: {question}")
+                print(
+                    f"\nSearching: {question}"
+                )
 
                 results = self.search_web(
                     question,
@@ -159,15 +173,18 @@ Return only the 5 questions as a numbered list.
                 # Fetch actual webpage content
                 for source in results:
 
-                    print(f"Reading: {source['title']}")
+                    print(
+                        f"Reading: {source['title']}"
+                    )
 
                     content = self.fetch_webpage(
                         source["url"]
                     )
 
                     # If webpage cannot be fetched,
-                    # keep the search snippet as fallback
+                    # use search snippet as fallback
                     if not content:
+
                         content = source["snippet"]
 
                     source["content"] = content
@@ -189,7 +206,7 @@ Return only the 5 questions as a numbered list.
         for i, source in enumerate(sources, 1):
 
             source_text += f"""
-Source {i}
+[Source {i}]
 
 Title:
 {source['title']}
@@ -215,19 +232,30 @@ Analyze the actual source content provided below.
 
 Provide:
 
-1. The main findings
+1. Main findings
 2. Important facts or claims
 3. Areas where the sources agree
 4. Areas where the sources differ
 5. Important uncertainties or limitations
 
-Rules:
+Citation rules:
+
+- Every important factual claim must include a source citation.
+- Use citations in the format [Source 1], [Source 2], etc.
+- Only cite a source if the provided content actually supports the claim.
+- A claim can cite multiple sources, for example [Source 1][Source 3].
+- Do not invent citations.
+- Do not cite a source merely because its title appears relevant.
+- If no provided source supports a claim, explicitly say that the
+  available sources do not provide sufficient evidence.
+
+General rules:
 
 - Use only information supported by the provided source content.
 - Do not invent facts.
 - Do not assume information that is not present.
 - Clearly state when the available sources are insufficient.
-- Identify which source supports important claims.
+- Keep the analysis objective and evidence-based.
 """
 
         response = self._generate_content(prompt)
@@ -237,7 +265,11 @@ Rules:
     # -----------------------------
     # 6. Analyze All Research
     # -----------------------------
-    def analyze_all_research(self, research_data, max_retries=3):
+    def analyze_all_research(
+        self,
+        research_data,
+        max_retries=3
+    ):
 
         analyses = []
 
@@ -245,12 +277,20 @@ Rules:
 
             question = item["question"]
 
-            for attempt in range(1, max_retries + 1):
+            for attempt in range(
+                1,
+                max_retries + 1
+            ):
 
                 try:
 
-                    print(f"\nAnalyzing: {question}")
-                    print(f"Attempt {attempt}/{max_retries}")
+                    print(
+                        f"\nAnalyzing: {question}"
+                    )
+
+                    print(
+                        f"Attempt {attempt}/{max_retries}"
+                    )
 
                     analysis = self.analyze_sources(
                         question,
@@ -276,11 +316,14 @@ Rules:
                     if attempt < max_retries:
 
                         print("Retrying...")
+
                         time.sleep(5)
 
                     else:
 
-                        print("✗ Failed after all retries")
+                        print(
+                            "✗ Failed after all retries"
+                        )
 
             time.sleep(2)
 
@@ -289,11 +332,18 @@ Rules:
     # -----------------------------
     # 7. Generate Final Report
     # -----------------------------
-    def generate_report(self, topic, all_research):
+    def generate_report(
+        self,
+        topic,
+        all_research
+    ):
 
         research_text = ""
 
-        for i, item in enumerate(all_research, 1):
+        for i, item in enumerate(
+            all_research,
+            1
+        ):
 
             research_text += f"""
 Research Question {i}:
@@ -308,7 +358,8 @@ Sources:
             for source in item["sources"]:
 
                 research_text += (
-                    f"- {source['title']} | {source['url']}\n"
+                    f"- {source['title']} | "
+                    f"{source['url']}\n"
                 )
 
         prompt = f"""
@@ -341,6 +392,8 @@ Important rules:
 - Do not invent facts or sources.
 - Keep the writing professional and objective.
 - Include source URLs in the References section.
+- Preserve source citations such as [Source 1] and [Source 2]
+  when they appear in the analysis.
 - Clearly distinguish findings from uncertainty.
 """
 
@@ -353,25 +406,33 @@ Important rules:
     # -----------------------------
     def run(self, topic):
 
-        print("\nGenerating research questions...")
+        print(
+            "\nGenerating research questions..."
+        )
 
         questions = self.generate_research_questions(
             topic
         )
 
-        print("\nSearching the web and reading sources...")
+        print(
+            "\nSearching the web and reading sources..."
+        )
 
         research_data = self.research_questions_to_searches(
             questions
         )
 
-        print("\nAnalyzing sources...")
+        print(
+            "\nAnalyzing sources..."
+        )
 
         analyses = self.analyze_all_research(
             research_data
         )
 
-        print("\nGenerating final report...")
+        print(
+            "\nGenerating final report..."
+        )
 
         report = self.generate_report(
             topic,
