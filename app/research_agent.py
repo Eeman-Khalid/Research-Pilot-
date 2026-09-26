@@ -266,3 +266,34 @@ Important rules:
         response = self._generate_content(prompt)
 
         return response.text
+    # -----------------------------
+    # 7. Run Complete Research Pipeline
+    # -----------------------------
+    def run(self, topic):
+
+        print("\nGenerating research questions...")
+        questions = self.generate_research_questions(topic)
+
+        print("\nSearching the web...")
+        research_data = self.research_questions_to_searches(
+            questions
+        )
+
+        print("\nAnalyzing sources...")
+        analyses = self.analyze_all_research(
+            research_data
+        )
+
+        print("\nGenerating final report...")
+        report = self.generate_report(
+            topic,
+            analyses
+        )
+
+        return {
+            "topic": topic,
+            "questions": questions,
+            "research_data": research_data,
+            "analyses": analyses,
+            "report": report
+        }
