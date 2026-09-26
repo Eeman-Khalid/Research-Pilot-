@@ -2,3 +2,5 @@ google-genai
 ddgs
 streamlit
 python-dotenv
+requests
+beautifulsoup4
