@@ -4,7 +4,6 @@ import requests
 from bs4 import BeautifulSoup
 from ddgs import DDGS
 from google import genai
-from google.genai import errors
 
 
 class ResearchAgent:
@@ -21,6 +20,7 @@ class ResearchAgent:
         for attempt in range(1, max_retries + 1):
 
             try:
+
                 response = self.client.models.generate_content(
                     model=self.model,
                     contents=prompt
@@ -28,11 +28,11 @@ class ResearchAgent:
 
                 return response
 
-            except errors.ServerError:
+            except Exception as e:
 
                 print(
-                    f"Gemini server error "
-                    f"(attempt {attempt}/{max_retries})"
+                    f"Gemini API error "
+                    f"(attempt {attempt}/{max_retries}): {e}"
                 )
 
                 if attempt == max_retries:
@@ -74,20 +74,32 @@ Return only the 5 questions as a numbered list.
 
         results = []
 
-        with DDGS() as ddgs:
+        try:
 
-            search_results = ddgs.text(
-                query,
-                max_results=max_results
+            with DDGS() as ddgs:
+
+                search_results = ddgs.text(
+                    query,
+                    max_results=max_results
+                )
+
+                for result in search_results:
+
+                    results.append({
+                        "title": result.get("title"),
+                        "url": result.get("href"),
+                        "snippet": result.get("body")
+                    })
+
+        except Exception as e:
+
+            print(
+                f"Web search failed for query: {query}"
             )
 
-            for result in search_results:
-
-                results.append({
-                    "title": result.get("title"),
-                    "url": result.get("href"),
-                    "snippet": result.get("body")
-                })
+            print(
+                f"Reason: {e}"
+            )
 
         return results
 
@@ -95,6 +107,9 @@ Return only the 5 questions as a numbered list.
     # 3. Fetch Webpage Content
     # -----------------------------
     def fetch_webpage(self, url, max_chars=10000):
+
+        if not url:
+            return ""
 
         try:
 
@@ -174,18 +189,21 @@ Return only the 5 questions as a numbered list.
                 for source in results:
 
                     print(
-                        f"Reading: {source['title']}"
+                        f"Reading: {source.get('title', 'Unknown source')}"
                     )
 
                     content = self.fetch_webpage(
-                        source["url"]
+                        source.get("url")
                     )
 
                     # If webpage cannot be fetched,
                     # use search snippet as fallback
                     if not content:
 
-                        content = source["snippet"]
+                        content = source.get(
+                            "snippet",
+                            ""
+                        )
 
                     source["content"] = content
 
@@ -209,10 +227,10 @@ Return only the 5 questions as a numbered list.
 [Source {i}]
 
 Title:
-{source['title']}
+{source.get('title', 'Unknown')}
 
 URL:
-{source['url']}
+{source.get('url', 'Unavailable')}
 
 Content:
 {source.get('content', source.get('snippet', ''))}
@@ -358,8 +376,8 @@ Sources:
             for source in item["sources"]:
 
                 research_text += (
-                    f"- {source['title']} | "
-                    f"{source['url']}\n"
+                    f"- {source.get('title', 'Unknown')} | "
+                    f"{source.get('url', 'Unavailable')}\n"
                 )
 
         prompt = f"""
