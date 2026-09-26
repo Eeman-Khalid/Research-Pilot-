@@ -31,8 +31,9 @@ st.title("🔎 ResearchPilot")
 st.subheader("AI-Powered Autonomous Research Agent")
 
 st.write(
-    "Enter a research topic and ResearchPilot will generate research "
-    "questions, search the web, analyze sources, and generate a structured report."
+    "Enter any research topic and ResearchPilot will generate "
+    "research questions, search the web, analyze sources, and "
+    "generate a structured research report."
 )
 
 
@@ -40,10 +41,12 @@ st.write(
 # API Key Check
 # -----------------------------
 if not api_key:
+
     st.error(
-        "GEMINI_API_KEY not found. "
-        "Please add it to your .env file."
+        "ResearchPilot could not find the Gemini API key. "
+        "Please configure GEMINI_API_KEY in the environment."
     )
+
     st.stop()
 
 
@@ -52,8 +55,10 @@ if not api_key:
 # -----------------------------
 topic = st.text_area(
     "Research Topic",
-    placeholder="e.g. Impact of Artificial Intelligence on Healthcare",
-    height=100
+    placeholder=(
+        "e.g. Impact of Remote Work on Employee Productivity"
+    ),
+    height=120
 )
 
 
@@ -62,9 +67,13 @@ topic = st.text_area(
 # -----------------------------
 if st.button(
     "🚀 Start Research",
-    type="primary"
+    type="primary",
+    use_container_width=True
 ):
 
+    # -----------------------------
+    # Validate Input
+    # -----------------------------
     if not topic.strip():
 
         st.warning(
@@ -73,62 +82,131 @@ if st.button(
 
         st.stop()
 
+    # -----------------------------
+    # Create Agent
+    # -----------------------------
     agent = ResearchAgent(api_key)
 
     # -----------------------------
-    # Run Research Agent
+    # Run Research Pipeline
     # -----------------------------
-    with st.status(
-        "ResearchPilot is working...",
-        expanded=True
-    ) as status:
+    try:
 
-        st.write("🧠 Generating research questions...")
+        with st.status(
+            "ResearchPilot is working...",
+            expanded=True
+        ) as status:
 
-        try:
+            # Step 1
+            st.write(
+                "🧠 Generating research questions..."
+            )
 
             questions = agent.generate_research_questions(
-                topic
+                topic.strip()
             )
 
-            st.write("🌐 Searching the web and reading sources...")
-
-            research_data = agent.research_questions_to_searches(
-                questions
+            # Step 2
+            st.write(
+                "🌐 Searching the web and reading sources..."
             )
 
-            st.write("📊 Analyzing research sources...")
+            research_data = (
+                agent.research_questions_to_searches(
+                    questions
+                )
+            )
+
+            # Check whether search returned anything
+            total_sources = sum(
+                len(item.get("sources", []))
+                for item in research_data
+            )
+
+            if total_sources == 0:
+
+                status.update(
+                    label="Research could not continue",
+                    state="error",
+                    expanded=True
+                )
+
+                st.error(
+                    "No web sources were found for this topic. "
+                    "Please try a broader or more specific topic."
+                )
+
+                st.stop()
+
+            # Step 3
+            st.write(
+                "📊 Analyzing research sources..."
+            )
 
             analyses = agent.analyze_all_research(
                 research_data
             )
 
-            st.write("📝 Generating final research report...")
+            # Step 4
+            st.write(
+                "📝 Generating final research report..."
+            )
+
+            if not analyses:
+
+                status.update(
+                    label="Research analysis failed",
+                    state="error",
+                    expanded=True
+                )
+
+                st.error(
+                    "The sources were found, but none could be "
+                    "successfully analyzed."
+                )
+
+                st.stop()
 
             report = agent.generate_report(
-                topic,
+                topic.strip(),
                 analyses
             )
 
+            if not report.strip():
+
+                status.update(
+                    label="Report generation failed",
+                    state="error",
+                    expanded=True
+                )
+
+                st.error(
+                    "Research was completed, but no report "
+                    "was generated."
+                )
+
+                st.stop()
+
+            # Success
             status.update(
                 label="Research completed successfully!",
                 state="complete",
                 expanded=False
             )
 
-        except Exception as e:
+    except Exception:
 
-            status.update(
-                label="Research failed",
-                state="error",
-                expanded=True
-            )
+        st.error(
+            "ResearchPilot encountered an unexpected error "
+            "while processing your research topic."
+        )
 
-            st.error(
-                f"An error occurred: {e}"
-            )
+        st.info(
+            "Please try again. If the problem continues, "
+            "check the terminal for technical details."
+        )
 
-            st.stop()
+        st.stop()
 
 
     # -----------------------------
@@ -152,24 +230,32 @@ if st.button(
     # -----------------------------
     # Research Statistics
     # -----------------------------
-    total_sources = sum(
-        len(item["sources"])
-        for item in research_data
+    total_questions = len(
+        [
+            q for q in question_lines
+            if q.strip()
+        ]
     )
 
     total_analyses = len(analyses)
 
-
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
+
+        st.metric(
+            "Questions Generated",
+            total_questions
+        )
+
+    with col2:
 
         st.metric(
             "Sources Found",
             total_sources
         )
 
-    with col2:
+    with col3:
 
         st.metric(
             "Sources Analyzed",
@@ -180,7 +266,7 @@ if st.button(
     # -----------------------------
     # Source Details
     # -----------------------------
-    st.header("🌐 Sources")
+    st.header("🌐 Research Sources")
 
     for i, item in enumerate(
         research_data,
@@ -191,26 +277,56 @@ if st.button(
             f"Research Question {i}: {item['question']}"
         ):
 
+            sources = item.get(
+                "sources",
+                []
+            )
+
+            if not sources:
+
+                st.warning(
+                    "No sources were found for this question."
+                )
+
+                continue
+
             for j, source in enumerate(
-                item["sources"],
+                sources,
                 1
             ):
 
-                st.markdown(
-                    f"**Source {j}: {source['title']}**"
+                title = source.get(
+                    "title",
+                    "Unknown source"
                 )
 
-                st.write(
-                    source["snippet"]
+                snippet = source.get(
+                    "snippet",
+                    "No description available."
+                )
+
+                url = source.get(
+                    "url",
+                    ""
                 )
 
                 st.markdown(
-                    f"[Open Source]({source['url']})"
+                    f"**Source {j}: {title}**"
                 )
+
+                st.write(snippet)
+
+                if url:
+
+                    st.markdown(
+                        f"[🔗 Open Source]({url})"
+                    )
+
+                st.divider()
 
 
     # -----------------------------
-    # Final Report
+    # Final Research Report
     # -----------------------------
     st.header("📄 Final Research Report")
 
@@ -224,5 +340,6 @@ if st.button(
         label="⬇️ Download Research Report",
         data=report,
         file_name="research_report.md",
-        mime="text/markdown"
+        mime="text/markdown",
+        use_container_width=True
     )
