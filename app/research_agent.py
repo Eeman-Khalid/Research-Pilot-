@@ -1,18 +1,51 @@
 import time
+
 from ddgs import DDGS
 from google import genai
+from google.genai import errors
 
 
 class ResearchAgent:
 
-    def __init__(self, api_key, model="gemini-3.8-flash"):
+    def __init__(self, api_key, model="gemini-3.5-flash-lite"):
         self.client = genai.Client(api_key=api_key)
         self.model = model
+
+    # -----------------------------
+    # Gemini API Helper with Retry
+    # -----------------------------
+    def _generate_content(self, prompt, max_retries=3):
+
+        for attempt in range(1, max_retries + 1):
+
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=prompt
+                )
+
+                return response
+
+            except errors.ServerError:
+
+                print(
+                    f"Gemini server error "
+                    f"(attempt {attempt}/{max_retries})"
+                )
+
+                if attempt == max_retries:
+                    raise
+
+                wait_time = 5 * attempt
+
+                print(f"Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
 
     # -----------------------------
     # 1. Generate Research Questions
     # -----------------------------
     def generate_research_questions(self, topic):
+
         prompt = f"""
 You are a research planning agent.
 
@@ -25,10 +58,7 @@ Research Topic:
 Return only the 5 questions as a numbered list.
 """
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt
-        )
+        response = self._generate_content(prompt)
 
         return response.text
 
@@ -36,15 +66,18 @@ Return only the 5 questions as a numbered list.
     # 2. Web Search
     # -----------------------------
     def search_web(self, query, max_results=5):
+
         results = []
 
         with DDGS() as ddgs:
+
             search_results = ddgs.text(
                 query,
                 max_results=max_results
             )
 
             for result in search_results:
+
                 results.append({
                     "title": result.get("title"),
                     "url": result.get("href"),
@@ -57,12 +90,15 @@ Return only the 5 questions as a numbered list.
     # 3. Search Each Question
     # -----------------------------
     def research_questions_to_searches(self, questions):
+
         searches = []
 
         for question in questions.split("\n"):
+
             question = question.strip()
 
             if question and question[0].isdigit():
+
                 question = question.split(".", 1)[-1].strip()
 
                 results = self.search_web(
@@ -85,8 +121,10 @@ Return only the 5 questions as a numbered list.
         source_text = ""
 
         for i, source in enumerate(sources, 1):
+
             source_text += f"""
 Source {i}
+
 Title: {source['title']}
 URL: {source['url']}
 Snippet: {source['snippet']}
@@ -103,6 +141,7 @@ Below are web search results related to this question:
 {source_text}
 
 Analyze these sources and provide:
+
 1. The main findings
 2. Important facts or claims
 3. Areas where the sources agree
@@ -112,10 +151,7 @@ Do not invent information that is not supported by the provided sources.
 Clearly mention when the available information is insufficient.
 """
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt
-        )
+        response = self._generate_content(prompt)
 
         return response.text
 
@@ -127,12 +163,14 @@ Clearly mention when the available information is insufficient.
         analyses = []
 
         for item in research_data:
+
             question = item["question"]
 
             for attempt in range(1, max_retries + 1):
 
                 try:
-                    print(f"Analyzing: {question}")
+
+                    print(f"\nAnalyzing: {question}")
                     print(f"Attempt {attempt}/{max_retries}")
 
                     analysis = self.analyze_sources(
@@ -147,17 +185,20 @@ Clearly mention when the available information is insufficient.
                     })
 
                     print("✓ Completed")
+
                     break
 
                 except Exception as e:
 
-                    print(f"⚠ Attempt {attempt} failed")
+                    print(f"⚠ Attempt {attempt} failed: {e}")
 
                     if attempt < max_retries:
+
                         print("Retrying...")
                         time.sleep(5)
 
                     else:
+
                         print("✗ Failed after all retries")
 
             time.sleep(2)
@@ -184,6 +225,7 @@ Sources:
 """
 
             for source in item["sources"]:
+
                 research_text += (
                     f"- {source['title']} | {source['url']}\n"
                 )
@@ -213,6 +255,7 @@ Use exactly these sections:
 # References
 
 Important rules:
+
 - Base the report only on the provided research.
 - Do not invent facts or sources.
 - Keep the writing professional and objective.
@@ -220,9 +263,6 @@ Important rules:
 - Clearly distinguish findings from uncertainty.
 """
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt
-        )
+        response = self._generate_content(prompt)
 
         return response.text
