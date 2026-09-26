@@ -44,3 +44,34 @@ for i, item in enumerate(research_data, 1):
         print(f"\n{j}. {source['title']}")
         print(f"URL: {source['url']}")
         print(f"Snippet: {source['snippet']}")
+
+# Analyze the collected sources
+
+print("\n\nSOURCE ANALYSIS")
+print("=" * 60)
+
+analyses = agent.analyze_all_research(research_data)
+
+for i, item in enumerate(analyses, 1):
+
+    print(f"\nRESEARCH QUESTION {i}")
+    print("=" * 60)
+
+    print(item["question"])
+
+    print("\nANALYSIS")
+    print("-" * 60)
+
+    print(item["analysis"])
+
+# Generate final research report
+
+print("\n\nFINAL RESEARCH REPORT")
+print("=" * 60)
+
+final_report = agent.generate_report(
+    topic,
+    analyses
+)
+
+print(final_report)
